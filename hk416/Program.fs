@@ -8,6 +8,7 @@ open System.Threading.Tasks
 open Discord
 open FSharp.Control.Tasks
 open System.Collections.Generic
+open System.Text.RegularExpressions
 
 let (>>=) m f = Option.bind f m
 
@@ -29,13 +30,26 @@ let content m = m.Content
 let auther m = m.Author
 let isBot (u:SocketUser) = u.IsBot
 let toLower (s:String) = s.ToLower()
-let hk416Id = 739455874434859028UL
-let hk4126Mentioned (mentioned:IReadOnlyCollection<SocketUser>) = Seq.exists (fun (s:SocketUser) -> s.Id = hk416Id) mentioned
+
+let (|ParseRegex|_|) regex str =
+   let m = Regex(regex).Match(str)
+   match m.Success with
+   | true -> Some m.Value
+   | false -> None
 
 let sendMessage (channel:ISocketMessageChannel) msg = task {
     let! r = channel.SendMessageAsync(msg, false, null, null)
     return ()
 }
+
+let mutable messages = []
+let mutable happyEmote : string option = None
+let mutable shookEmote : string option = None
+
+let (|Mentioned|_|) message = 
+    match message with
+    | ParseRegex "<@!739455874434859028>" _ -> Some ()
+    | _ -> None
 
 let (|RepeatAfterThree|_|) messages =
     match List.take 3 messages with
@@ -47,6 +61,7 @@ let (|RepeatAfterThree|_|) messages =
 
 let (|Commander|_|) messages =
     match (List.map content >> List.head >> toLower) messages with
+    // | Mentioned -> Some "Commander. I am all you need." TODO: Ideally match only when its a ping and nothing else in the message
     | m when m = "416" -> Some "Commander. I am all you need."
     | m when m = "hk416" -> Some "Commander. I am all you need."
     | _ -> None
@@ -56,20 +71,27 @@ let (|HK4M|_|) messages =
     | m when m = "hk4m" -> Some "HKM4? I have no need for such a name anymore!"
     | _ -> None
 
-// let (|Pat|_|) messages = 
-//     match List.head messages with
-//     | m when m.Content = "k!pat" -> Some Emote.TryParse "\\:happy416:"
-//         let emote = Emote.Parse "\\:happy416:"
-        
-//     | _ -> None
+let (|Pat|_|) messages = 
+    let message = (List.head >> content) messages
+    match happyEmote, message, message with
+    | Some emote, Mentioned, ParseRegex "k!pat .*" _ -> Some emote
+    | _ -> None
 
-let mutable messages = []
+let trySetHappyEmote message = 
+    match happyEmote, message with
+    | None, ParseRegex "<:happy416:\\d*>" emote -> happyEmote <- Some emote
+    | _ -> ()
+
+let trySetShookEmote message = 
+    match shookEmote, message with
+    | None, ParseRegex "<:shook416:\\d*>" emote -> shookEmote <- Some emote
+    | _ -> ()
 
 let respond sendMessage = task {
     match messages with
+    | Pat m -> do! sendMessage m
     | Commander m -> do! sendMessage m
     | HK4M m -> do! sendMessage m
-    // | Pat m -> do! sendMessage m
     | RepeatAfterThree m -> do! sendMessage m
     | _ -> return ()
 }
@@ -86,8 +108,9 @@ let handleMessage (message:SocketMessage) = task {
         | _ ->
             // message.MentionedUsers
             messages <- (toMessage message) :: messages
-            printfn "lastMessage: %O" message
-            printfn "Messages: %O" messages
+            trySetHappyEmote message.Content
+            trySetShookEmote message.Content
+            printfn "%O" message
             do! respond (sendMessage message.Channel)
             return ()
     | _ -> return ()
