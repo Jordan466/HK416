@@ -45,6 +45,7 @@ let sendMessage (channel:ISocketMessageChannel) msg = task {
 let mutable messages = []
 let mutable happyEmote : string option = None
 let mutable shookEmote : string option = None
+let mutable drinkEmote : string option = None
 
 let (|Mentioned|_|) message = 
     match message with
@@ -77,6 +78,12 @@ let (|Pat|_|) messages =
     | Some emote, Mentioned, ParseRegex "k!pat .*" _ -> Some emote
     | _ -> None
 
+let (|Kanpai|_|) messages =
+    let message = (List.head >> content >> toLower) messages
+    match drinkEmote, message with
+    | Some emote, ParseRegex "kanpai" _ -> Some emote
+    | _ -> None
+
 let trySetHappyEmote message = 
     match happyEmote, message with
     | None, ParseRegex "<:happy416:\\d*>" emote -> happyEmote <- Some emote
@@ -87,9 +94,15 @@ let trySetShookEmote message =
     | None, ParseRegex "<:shook416:\\d*>" emote -> shookEmote <- Some emote
     | _ -> ()
 
+let trySetDrinkEmote message = 
+    match shookEmote, message with
+    | None, ParseRegex "<:drink416:\\d*>" emote -> drinkEmote <- Some emote
+    | _ -> ()
+
 let respond sendMessage = task {
     match messages with
     | Pat m -> do! sendMessage m
+    | Kanpai m -> do! sendMessage m
     | Commander m -> do! sendMessage m
     | HK4M m -> do! sendMessage m
     | RepeatAfterThree m -> do! sendMessage m
@@ -110,6 +123,7 @@ let handleMessage (message:SocketMessage) = task {
             messages <- (toMessage message) :: messages
             trySetHappyEmote message.Content
             trySetShookEmote message.Content
+            trySetDrinkEmote message.Content
             printfn "%O" message
             do! respond (sendMessage message.Channel)
             return ()
