@@ -1,14 +1,10 @@
-﻿// Learn more about F# at http://fsharp.org
-
-open System
-open Discord.WebSocket
-open Discord.Commands
-open System.Reflection
+﻿open System
 open System.Threading.Tasks
-open Discord
 open FSharp.Control.Tasks
-open System.Collections.Generic
 open System.Text.RegularExpressions
+open DSharpPlus
+open DSharpPlus.EventArgs
+open DSharpPlus.Entities
 
 let (>>=) m f = Option.bind f m
 
@@ -16,19 +12,14 @@ let trim (m:String) = Some (m.Trim())
 
 type Message = {
     Content: string
-    Author: SocketUser
-    MentionedUsers: IReadOnlyCollection<SocketUser>
+    Author: DiscordUser
+    MentionedUsers: DiscordUser list
+    Channel: DiscordChannel
 }
 
-let toMessage (m:SocketUserMessage) = {
-    Content = m.Content
-    Author = m.Author
-    MentionedUsers = m.MentionedUsers
-}
-
-let content m = m.Content
-let auther m = m.Author
-let isBot (u:SocketUser) = u.IsBot
+let content message = message.Content
+let auther message = message.Author
+let isBot (user:DiscordUser) = user.IsBot
 let toLower (s:String) = s.ToLower()
 
 let (|ParseRegex|_|) regex str =
@@ -36,11 +27,6 @@ let (|ParseRegex|_|) regex str =
    match m.Success with
    | true -> Some m.Value
    | false -> None
-
-let sendMessage (channel:ISocketMessageChannel) msg = task {
-    let! r = channel.SendMessageAsync(msg, false, null, null)
-    return ()
-}
 
 let mutable messages = []
 let mutable happyEmote : string option = None
@@ -55,33 +41,34 @@ let (|Mentioned|_|) message =
 let (|RepeatAfterThree|_|) messages =
     match List.take 3 messages with
     | messages when List.exists (auther >> isBot) messages -> None
-    | messages -> 
-        match List.map content messages with
-        | [one; two; three] when one = two && one = three -> Some one
-        | _ -> None
+    | [one; two; three] when
+        (one.Content = two.Content && one.Content = three.Content)
+        && (one.Channel = two.Channel && one.Channel = three.Channel) ->
+        Some (three.Content, three.Channel)
+    | _ -> None
 
 let (|Commander|_|) messages =
-    match (List.map content >> List.head >> toLower) messages with
+    match List.head messages with
     // | Mentioned -> Some "Commander. I am all you need." TODO: Ideally match only when its a ping and nothing else in the message
-    | m when m = "416" -> Some "Commander. I am all you need."
-    | m when m = "hk416" -> Some "Commander. I am all you need."
+    | m when toLower m.Content = "416" || toLower m.Content = "hk416" ->
+        Some ("Commander. I am all you need.", m.Channel)
     | _ -> None
 
 let (|HK4M|_|) messages = 
-    match (List.map content >> List.head >> toLower) messages with
-    | m when m = "hk4m" -> Some "HKM4? I have no need for such a name anymore!"
+    match List.head messages with
+    | m when toLower m.Content = "hk4m" -> Some ("HKM4? I have no need for such a name anymore!", m.Channel)
     | _ -> None
 
 let (|Pat|_|) messages = 
-    let message = (List.head >> content) messages
-    match happyEmote, message, message with
-    | Some emote, Mentioned, ParseRegex "k!pat .*" _ -> Some emote
+    let message = List.head messages
+    match happyEmote, message.Content, message.Content with
+    | Some emote, Mentioned, ParseRegex "k!pat .*" _ -> Some (emote, message.Channel)
     | _ -> None
 
 let (|Kanpai|_|) messages =
-    let message = (List.head >> content >> toLower) messages
-    match drinkEmote, message with
-    | Some emote, ParseRegex "kanpai" _ -> Some emote
+    let message = List.head messages
+    match drinkEmote, toLower message.Content with
+    | Some emote, ParseRegex "kanpai" _ -> Some (emote, message.Channel)
     | _ -> None
 
 let trySetHappyEmote message = 
@@ -99,48 +86,52 @@ let trySetDrinkEmote message =
     | None, ParseRegex "<:drink416:\\d*>" emote -> drinkEmote <- Some emote
     | _ -> ()
 
-let respond sendMessage = task {
+let respond (client:DiscordClient) = task {
+    let sendMessage message channel = task {
+        let! m = client.SendMessageAsync(channel, message)
+        return ()
+    }
+        
     match messages with
-    | Pat m -> do! sendMessage m
-    | Kanpai m -> do! sendMessage m
-    | Commander m -> do! sendMessage m
-    | HK4M m -> do! sendMessage m
-    | RepeatAfterThree m -> do! sendMessage m
+    | Pat (m, c) -> do! sendMessage m c
+    | Kanpai (m, c) -> do! sendMessage m c
+    | Commander (m, c) -> do! sendMessage m c
+    | HK4M (m, c) -> do! sendMessage m c
+    | RepeatAfterThree (m, c) -> do! sendMessage m c
     | _ -> return ()
 }
 
-let client = new DiscordSocketClient()
-let commands = new CommandService()
+let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
+    let message = {
+        Content = m.Message.Content
+        Author = m.Author
+        MentionedUsers = List.ofSeq m.MentionedUsers
+        Channel = m.Channel
+    }
+    messages <- message :: messages
+    trySetHappyEmote message.Content
+    trySetShookEmote message.Content
+    trySetDrinkEmote message.Content
+    do! respond client
+}
 
-let handleMessage (message:SocketMessage) = task {
-    let argPos = 0
-    match message with
-    | :? SocketUserMessage as message ->
-        match message with
-        | message when isNull message -> return ()
-        | _ ->
-            // message.MentionedUsers
-            messages <- (toMessage message) :: messages
-            trySetHappyEmote message.Content
-            trySetShookEmote message.Content
-            trySetDrinkEmote message.Content
-            printfn "%O" message
-            do! respond (sendMessage message.Channel)
-            return ()
-    | _ -> return ()
+let greeting client g = task {
+    return ()
 }
 
 [<EntryPoint>]
 let main argv =
-    let assembly = Assembly.GetExecutingAssembly()
+    let config = DiscordConfiguration()
+    config.set_Token argv.[0]
+    config.set_TokenType TokenType.Bot
+
+    let client = new DiscordClient(config)
+    client.add_MessageCreated (fun m -> handleMessage client m |> ignore; Task.CompletedTask)
+    client.add_GuildCreated (fun g -> greeting client g |> ignore; Task.CompletedTask)
+
     let t = task {
-        let! moduleInfo = commands.AddModulesAsync(assembly, null)
-        client.add_Log (fun m -> printfn "%O" m; Task.CompletedTask)
-        client.add_MessageReceived (fun m -> handleMessage m |> ignore; Task.CompletedTask)
-        do! client.LoginAsync(TokenType.Bot, argv.[0])
-        do! client.StartAsync()
+        do! client.ConnectAsync()
         do! Task.Delay(-1)
-        return ()
     }
     t.Wait()
     0 // return an integer exit code
