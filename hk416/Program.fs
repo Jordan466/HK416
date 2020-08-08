@@ -69,6 +69,12 @@ let (|Kanpai|_|) messages =
     | Some emote, ParseRegex "kanpai" _ -> Some (emote, message.Channel)
     | _ -> None
 
+let (|GoodMorning|_|) messages =
+    let message = List.head messages
+    match message.Content, message.Content with
+    | Mentioned, ParseRegex "good morning" _ -> Some ("Good morning, Commander. I won't lose to anyone today.", message.Channel)
+    | _ -> None
+
 let trySetHappyEmote message = 
     match happyEmote, message with
     | None, ParseRegex "<:happy416:\\d*>" emote -> happyEmote <- Some emote
@@ -97,6 +103,7 @@ let respond (client:DiscordClient) = task {
     | Kanpai (m, c) -> do! sendMessage m c
     | Commander (m, c) -> do! sendMessage m c
     | HK4M (m, c) -> do! sendMessage m c
+    | GoodMorning (m,c) -> do! sendMessage m c
     | RepeatAfterThree (m, c) -> do! sendMessage m c
     | _ -> return ()
 }
