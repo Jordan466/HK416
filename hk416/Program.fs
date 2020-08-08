@@ -8,8 +8,6 @@ open DSharpPlus.Entities
 
 let (>>=) m f = Option.bind f m
 
-let trim (m:String) = Some (m.Trim())
-
 type Message = {
     Content: string
     Author: DiscordUser
@@ -115,8 +113,13 @@ let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
     do! respond client
 }
 
-let greeting client g = task {
-    return ()
+let greeting (client:DiscordClient) (g:GuildCreateEventArgs) = task {
+    let general = Seq.tryFind (fun (c:DiscordChannel) -> c.Name = "general") g.Guild.Channels
+    match general with
+    | None -> return ()
+    | Some channel -> 
+        let! m = client.SendMessageAsync(channel, "Are you the commander? HK416. Please remember this name, this extraordinary name.")
+        return ()
 }
 
 [<EntryPoint>]
@@ -131,6 +134,7 @@ let main argv =
 
     let t = task {
         do! client.ConnectAsync()
+        printfn "Connected"
         do! Task.Delay(-1)
     }
     t.Wait()
