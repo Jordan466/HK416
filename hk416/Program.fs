@@ -71,8 +71,14 @@ let (|Kanpai|_|) messages =
 
 let (|GoodMorning|_|) messages =
     let message = List.head messages
-    match message.Content, message.Content with
-    | Mentioned, ParseRegex "good morning" _ -> Some ("Good morning, Commander. I won't lose to anyone today.", message.Channel)
+    match message.Content, toLower message.Content with
+    | Mentioned, ParseRegex "good morning" _ -> Some ("Good morning, Commander. I won't lose to anyone today", message.Channel)
+    | _ -> None
+
+let (|Genki|_|) messages =
+    let message = List.head messages
+    match message.Content, toLower message.Content with
+    | Mentioned, ParseRegex "how are you" _ -> Some ("I am perfect", message.Channel)
     | _ -> None
 
 let trySetHappyEmote message = 
@@ -104,6 +110,7 @@ let respond (client:DiscordClient) = task {
     | Commander (m, c) -> do! sendMessage m c
     | HK4M (m, c) -> do! sendMessage m c
     | GoodMorning (m,c) -> do! sendMessage m c
+    | Genki (m,c) -> do! sendMessage m c
     | RepeatAfterThree (m, c) -> do! sendMessage m c
     | _ -> return ()
 }
