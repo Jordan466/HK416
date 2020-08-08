@@ -91,7 +91,9 @@ let respond (client:DiscordClient) = task {
     }
         
     match messages with
-    | Pat (m, c) -> do! sendMessage m c
+    | Pat (m, c) -> 
+        do! Task.Delay(1000)
+        do! sendMessage m c
     | Kanpai (m, c) -> do! sendMessage m c
     | Commander (m, c) -> do! sendMessage m c
     | HK4M (m, c) -> do! sendMessage m c
