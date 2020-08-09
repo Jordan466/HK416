@@ -100,7 +100,7 @@ let respond (client:DiscordClient) = task {
     | HK4M (m, c) -> do! sendMessage m c
     | GoodMorning (m,c) -> do! sendMessage m c
     | Genki (m,c) -> do! sendMessage m c
-    | BreadBank (m,c) -> do! sendMessage m c
+    // | BreadBank (m,c) -> do! sendMessage m c
     | RepeatAfterThree (m, c) -> do! sendMessage m c
     | _ -> return ()
 }
