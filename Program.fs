@@ -5,26 +5,8 @@ open System.Text.RegularExpressions
 open DSharpPlus
 open DSharpPlus.EventArgs
 open DSharpPlus.Entities
-
-let (>>=) m f = Option.bind f m
-
-type Message = {
-    Content: string
-    Author: DiscordUser
-    MentionedUsers: DiscordUser list
-    Channel: DiscordChannel
-}
-
-let content message = message.Content
-let auther message = message.Author
-let isBot (user:DiscordUser) = user.IsBot
-let toLower (s:String) = s.ToLower()
-
-let (|ParseRegex|_|) regex str =
-   let m = Regex(regex).Match(str)
-   match m.Success with
-   | true -> Some m.Value
-   | false -> None
+open HK416.Contracts
+open HK416.BreadBank
 
 let mutable messages = []
 let mutable happyEmote : string option = None
@@ -81,6 +63,12 @@ let (|Genki|_|) messages =
     | Mentioned, ParseRegex "how are you" _ -> Some ("I am perfect", message.Channel)
     | _ -> None
 
+let (|PatMe|_|) messages =
+    let message = List.head messages
+    match toLower message.Content with
+    | ParseRegex "pat me" _ -> Some ("k!pat " + message.Author.Username, message.Channel)
+    | _ -> None
+
 let trySetHappyEmote message = 
     match happyEmote, message with
     | None, ParseRegex "<:happy416:\\d*>" emote -> happyEmote <- Some emote
@@ -106,11 +94,13 @@ let respond (client:DiscordClient) = task {
     | Pat (m, c) -> 
         do! Task.Delay(1000)
         do! sendMessage m c
+    | PatMe (m, c) -> do! sendMessage m c
     | Kanpai (m, c) -> do! sendMessage m c
     | Commander (m, c) -> do! sendMessage m c
     | HK4M (m, c) -> do! sendMessage m c
     | GoodMorning (m,c) -> do! sendMessage m c
     | Genki (m,c) -> do! sendMessage m c
+    | BreadBank (m,c) -> do! sendMessage m c
     | RepeatAfterThree (m, c) -> do! sendMessage m c
     | _ -> return ()
 }
