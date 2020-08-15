@@ -87,6 +87,7 @@ let trySetDrinkEmote message =
 let respond (client:DiscordClient) = task {
     let sendMessage message channel = task {
         let! m = client.SendMessageAsync(channel, message)
+        // printfn "%s: %s" channel.Name message
         return ()
     }
         
@@ -114,6 +115,7 @@ let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
         MentionedUsers = List.ofSeq m.MentionedUsers
         Channel = m.Channel
     }
+    printfn "%s: %s" m.Channel.Name message.Content
     messages <- message :: messages
     trySetHappyEmote message.Content
     trySetShookEmote message.Content
