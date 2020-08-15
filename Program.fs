@@ -80,7 +80,7 @@ let trySetShookEmote message =
     | _ -> ()
 
 let trySetDrinkEmote message = 
-    match shookEmote, message with
+    match drinkEmote, message with
     | None, ParseRegex "<:drink416:\\d*>" emote -> drinkEmote <- Some emote
     | _ -> ()
 
