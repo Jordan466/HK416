@@ -12,6 +12,7 @@ let mutable messages = []
 let mutable happyEmote : string option = None
 let mutable shookEmote : string option = None
 let mutable drinkEmote : string option = None
+let furiousPat = "https://i.ibb.co/fHfJ0MW/furiouspat.gif"
 
 let (|Mentioned|_|) message = 
     match message with
@@ -66,7 +67,7 @@ let (|Genki|_|) messages =
 let (|PatMe|_|) messages =
     let message = List.head messages
     match toLower message.Content with
-    | ParseRegex "pat me" _ -> Some ("k!pat " + message.Author.Username, message.Channel)
+    | ParseRegex "pat me" _ -> Some (message.Author.Mention, furiousPat, message.Channel)
     | _ -> None
 
 let trySetHappyEmote message = 
@@ -90,12 +91,18 @@ let respond (client:DiscordClient) = task {
         // printfn "%s: %s" channel.Name message
         return ()
     }
+
+    let sendEmbeded message channel embed = task {
+        let embed = DiscordEmbedBuilder(ImageUrl = embed).Build()
+        let! m = client.SendMessageAsync(channel, message, embed = embed)
+        return ()
+    }
         
     match messages with
     | Pat (m, c) -> 
         do! Task.Delay(1000)
         do! sendMessage m c
-    | PatMe (m, c) -> do! sendMessage m c
+    | PatMe (m, e, c) -> do! sendEmbeded m c e//do! sendMessage m c
     | Kanpai (m, c) -> do! sendMessage m c
     | Commander (m, c) -> do! sendMessage m c
     | HK4M (m, c) -> do! sendMessage m c
