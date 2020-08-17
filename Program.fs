@@ -123,7 +123,7 @@ let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
         Channel = m.Channel
     }
     printfn "%s: %s" m.Channel.Name message.Content
-    messages <- message :: messages
+    messages <- message :: List.take 1000 messages
     trySetHappyEmote message.Content
     trySetShookEmote message.Content
     trySetDrinkEmote message.Content
