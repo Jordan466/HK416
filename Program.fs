@@ -1,6 +1,6 @@
 ﻿open System
 open System.Threading.Tasks
-open FSharp.Control.Tasks
+open FSharp.Control.Tasks.V2
 open System.Text.RegularExpressions
 open DSharpPlus
 open DSharpPlus.EventArgs
@@ -20,12 +20,16 @@ let (|Mentioned|_|) message =
     | _ -> None
 
 let (|RepeatAfterThree|_|) messages =
-    match List.take 3 messages with
-    | messages when List.exists (auther >> isBot) messages -> None
-    | [one; two; three] when
-        (one.Content = two.Content && one.Content = three.Content)
-        && (one.Channel = two.Channel && one.Channel = three.Channel) ->
-        Some (three.Content, three.Channel)
+    //TODO: Dont throw exceptions when there are less than 3 messages
+    try
+        match List.take 3 messages with
+        | messages when List.exists (auther >> isBot) messages -> None
+        | [one; two; three] when
+            (one.Content = two.Content && one.Content = three.Content)
+            && (one.Channel = two.Channel && one.Channel = three.Channel) ->
+            Some (three.Content, three.Channel)
+        | _ -> None
+    with
     | _ -> None
 
 let (|Commander|_|) messages =
@@ -97,7 +101,6 @@ let respond (client:DiscordClient) = task {
         let! m = client.SendMessageAsync(channel, message, embed = embed)
         return ()
     }
-        
     match messages with
     | Pat (m, c) -> 
         do! Task.Delay(1000)
@@ -116,18 +119,23 @@ let respond (client:DiscordClient) = task {
 }
 
 let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
-    let message = {
-        Content = m.Message.Content
-        Author = m.Author
-        MentionedUsers = List.ofSeq m.MentionedUsers
-        Channel = m.Channel
-    }
-    printfn "%s: %s" m.Channel.Name message.Content
-    messages <- message :: List.take 1000 messages
-    trySetHappyEmote message.Content
-    trySetShookEmote message.Content
-    trySetDrinkEmote message.Content
-    do! respond client
+    try
+        let message = {
+            Content = m.Message.Content
+            Author = m.Author
+            MentionedUsers = List.ofSeq m.MentionedUsers
+            Channel = m.Channel
+        }
+        printfn "%s: %s" m.Channel.Name message.Content
+        match List.length messages with
+        | l when l >= 1000 -> messages <- message :: List.take 1000 messages
+        | _ -> messages <- message :: messages
+        trySetHappyEmote message.Content
+        trySetShookEmote message.Content
+        trySetDrinkEmote message.Content
+        do! respond client
+    with
+    | e -> printfn "%O" e
 }
 
 let greeting (client:DiscordClient) (g:GuildCreateEventArgs) = task {
