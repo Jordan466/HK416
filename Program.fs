@@ -13,22 +13,26 @@ let mutable happyEmote : string option = None
 let mutable shookEmote : string option = None
 let mutable drinkEmote : string option = None
 let furiousPat = "https://i.ibb.co/fHfJ0MW/furiouspat.gif"
+let hk416Id = 739455874434859028uL
 
 let (|Mentioned|_|) message = 
     match message with
     | ParseRegex "<@!739455874434859028>" _ -> Some ()
     | _ -> None
 
+let mutable lastUsed : DateTimeOffset option = None
 let (|RepeatAfterThree|_|) messages =
     //TODO: Dont throw exceptions when there are less than 3 messages
     try
-        match List.take 3 messages with
-        | messages when List.exists (auther >> isBot) messages -> None
-        | [one; two; three] when
+        match lastUsed, List.take 3 messages with
+        | _, messages when List.exists (auther >> isBot) messages -> None
+        | last, [one; two; three] when
             (one.Content = two.Content && one.Content = three.Content)
-            && (one.Channel = two.Channel && one.Channel = three.Channel) ->
-            Some (three.Content, three.Channel)
-        | _ -> None
+            && (one.Channel = two.Channel && one.Channel = three.Channel)
+            && (last < Some (DateTimeOffset.Now.AddSeconds(20.0)) || last = None) ->
+                lastUsed <- Some DateTimeOffset.Now
+                Some (three.Content, three.Channel)
+        | _, _ -> None
     with
     | _ -> None
 
@@ -44,10 +48,22 @@ let (|HK4M|_|) messages =
     | m when toLower m.Content = "hk4m" -> Some ("HKM4? I have no need for such a name anymore!", m.Channel)
     | _ -> None
 
-let (|Pat|_|) messages = 
+let (|Pet|_|) messages = 
     let message = List.head messages
     match happyEmote, message.Content, message.Content with
     | Some emote, Mentioned, ParseRegex "k!pat .*" _ -> Some (emote, message.Channel)
+    | _ -> None
+
+let (|Pat|_|) messages = 
+    let message = List.head messages
+    match message.Content, message.Content with
+    | Mentioned, ParseRegex "pat" _ ->
+        let mentionedUsers =
+            List.filter (fun (u:DiscordUser) -> u.Id <> hk416Id) message.MentionedUsers
+            |> List.map (fun (u:DiscordUser) -> u.Mention)
+            |> List.distinct
+            |> List.fold (fun state m -> state + m + " ") ""
+        Some (mentionedUsers, furiousPat, message.Channel)
     | _ -> None
 
 let (|Kanpai|_|) messages =
@@ -102,10 +118,11 @@ let respond (client:DiscordClient) = task {
         return ()
     }
     match messages with
-    | Pat (m, c) -> 
+    | Pet (m, c) -> 
         do! Task.Delay(1000)
         do! sendMessage m c
-    | PatMe (m, e, c) -> do! sendEmbeded m c e//do! sendMessage m c
+    | PatMe (m, e, c) -> do! sendEmbeded m c e
+    | Pat (m, e, c) -> do! sendEmbeded m c e
     | Kanpai (m, c) -> do! sendMessage m c
     | Commander (m, c) -> do! sendMessage m c
     | HK4M (m, c) -> do! sendMessage m c
@@ -126,7 +143,7 @@ let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
             MentionedUsers = List.ofSeq m.MentionedUsers
             Channel = m.Channel
         }
-        printfn "%s: %s" m.Channel.Name message.Content
+        printfn "[%O] %s %s %s: %s" m.Message.Timestamp m.Guild.Name m.Channel.Name message.Author.Username message.Content
         match List.length messages with
         | l when l >= 1000 -> messages <- message :: List.take 1000 messages
         | _ -> messages <- message :: messages
