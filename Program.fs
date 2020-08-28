@@ -50,9 +50,9 @@ let (|Commander|_|) messages =
         Some ("Commander. I am all you need.", m.Channel)
     | _ -> None
 
-let (|HK4M|_|) messages = 
+let (|HKM4|_|) messages = 
     match List.head messages with
-    | m when toLower m.Content = "hk4m" -> Some ("HKM4? I have no need for such a name anymore!", m.Channel)
+    | m when toLower m.Content = "hkm4" -> Some ("HKM4? I have no need for such a name anymore!", m.Channel)
     | _ -> None
 
 let (|Pet|_|) messages = 
@@ -149,7 +149,7 @@ let respond (client:DiscordClient) = task {
     | Pat (m, e, c) -> do! sendEmbeded m c e
     | Kanpai (m, c) -> do! sendMessage m c
     | Commander (m, c) -> do! sendMessage m c
-    | HK4M (m, c) -> do! sendMessage m c
+    | HKM4 (m, c) -> do! sendMessage m c
     | GoodMorning (m,c) -> do! sendMessage m c
     | Genki (m,c) -> do! sendMessage m c
     | Slapped (m, c) -> 
