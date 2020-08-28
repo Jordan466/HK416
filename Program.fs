@@ -12,12 +12,19 @@ let mutable messages = []
 let mutable happyEmote : string option = None
 let mutable shookEmote : string option = None
 let mutable drinkEmote : string option = None
+let mutable stareEmote : string option = None
 let furiousPat = "https://i.ibb.co/fHfJ0MW/furiouspat.gif"
 let hk416Id = 739455874434859028uL
 
-let (|Mentioned|_|) message = 
+let (|Pinged|_|) message = 
     match message with
     | ParseRegex "<@!739455874434859028>" _ -> Some ()
+    | _ -> None
+
+let (|Mentioned|_|) message = 
+    match toLower message with
+    | ParseRegex "<@!739455874434859028>" _ -> Some ()
+    | ParseRegex "hk416" _ -> Some ()
     | _ -> None
 
 let mutable lastUsed : DateTimeOffset option = None
@@ -38,7 +45,7 @@ let (|RepeatAfterThree|_|) messages =
 
 let (|Commander|_|) messages =
     match List.head messages with
-    // | Mentioned -> Some "Commander. I am all you need." TODO: Ideally match only when its a ping and nothing else in the message
+    // | Pinged -> Some "Commander. I am all you need." TODO: Ideally match only when its a ping and nothing else in the message
     | m when toLower m.Content = "416" || toLower m.Content = "hk416" ->
         Some ("Commander. I am all you need.", m.Channel)
     | _ -> None
@@ -51,13 +58,25 @@ let (|HK4M|_|) messages =
 let (|Pet|_|) messages = 
     let message = List.head messages
     match happyEmote, message.Content, message.Content with
-    | Some emote, Mentioned, ParseRegex "k!pat .*" _ -> Some (emote, message.Channel)
+    | Some emote, Mentioned, ParseRegex "k!pat" _ -> Some (emote, message.Channel)
+    | _ -> None
+
+let (|Slapped|_|) messages = 
+    let message = List.head messages
+    match stareEmote, message.Content, message.Content with
+    | Some emote, Mentioned, ParseRegex "k!slap" _ -> Some (emote, message.Channel)
+    | _ -> None
+
+let (|Licked|_|) messages = 
+    let message = List.head messages
+    match stareEmote, message.Content, message.Content with
+    | Some emote, Mentioned, ParseRegex "k!lick" _ -> Some (emote, message.Channel)
     | _ -> None
 
 let (|Pat|_|) messages = 
     let message = List.head messages
-    match message.Content, message.Content with
-    | Mentioned, ParseRegex "pat" _ ->
+    match message.Content, toLower message.Content with
+    | Pinged, ParseRegex "pat" _ ->
         let mentionedUsers =
             List.filter (fun (u:DiscordUser) -> u.Id <> hk416Id) message.MentionedUsers
             |> List.map (fun (u:DiscordUser) -> u.Mention)
@@ -75,13 +94,13 @@ let (|Kanpai|_|) messages =
 let (|GoodMorning|_|) messages =
     let message = List.head messages
     match message.Content, toLower message.Content with
-    | Mentioned, ParseRegex "good morning" _ -> Some ("Good morning, Commander. I won't lose to anyone today", message.Channel)
+    | Pinged, ParseRegex "good morning" _ -> Some ("Good morning, Commander. I won't lose to anyone today", message.Channel)
     | _ -> None
 
 let (|Genki|_|) messages =
     let message = List.head messages
     match message.Content, toLower message.Content with
-    | Mentioned, ParseRegex "how are you" _ -> Some ("I am perfect", message.Channel)
+    | Pinged, ParseRegex "how are you" _ -> Some ("I am perfect", message.Channel)
     | _ -> None
 
 let (|PatMe|_|) messages =
@@ -103,6 +122,11 @@ let trySetShookEmote message =
 let trySetDrinkEmote message = 
     match drinkEmote, message with
     | None, ParseRegex "<:drink416:\\d*>" emote -> drinkEmote <- Some emote
+    | _ -> ()
+
+let trySetStareEmote message = 
+    match stareEmote, message with
+    | None, ParseRegex "<:stare416:\\d*>" emote -> stareEmote <- Some emote
     | _ -> ()
 
 let respond (client:DiscordClient) = task {
@@ -128,6 +152,12 @@ let respond (client:DiscordClient) = task {
     | HK4M (m, c) -> do! sendMessage m c
     | GoodMorning (m,c) -> do! sendMessage m c
     | Genki (m,c) -> do! sendMessage m c
+    | Slapped (m, c) -> 
+        do! Task.Delay(1000)
+        do! sendMessage m c
+    | Licked (m, c) -> 
+        do! Task.Delay(1000)
+        do! sendMessage m c
     //TODO: command to toggle bread bank and other settings
     // | Toggle (m,c) -> do! sendMessage m c
     // | BreadBank (m,c) -> do! sendMessage m c
@@ -150,6 +180,7 @@ let handleMessage (client:DiscordClient) (m:MessageCreateEventArgs) = task {
         trySetHappyEmote message.Content
         trySetShookEmote message.Content
         trySetDrinkEmote message.Content
+        trySetStareEmote message.Content
         do! respond client
     with
     | e -> printfn "%O" e
