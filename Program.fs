@@ -6,7 +6,6 @@ open DSharpPlus
 open DSharpPlus.EventArgs
 open DSharpPlus.Entities
 open HK416.Contracts
-open HK416.BreadBank
 
 let mutable messages = []
 let mutable happyEmote : string option = None

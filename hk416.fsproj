@@ -5,7 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Contracts.fs" />
-    <Compile Include="breadbank.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
